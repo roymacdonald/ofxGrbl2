@@ -1,15 +1,7 @@
 #pragma once
 #include "ofMain.h"
 
-enum ofxGrblMode{
-	OFXGRBL_SPINDLE,
-	OFXGRBL_LASER,
-	OFXGRBL_PLOTTER
-} ;
-enum ofxGrblUnits{
-	OFXGRBL_MILLIMETERS,
-	OFXGRBL_INCHES
-};
+#include "ofxGrblConstants.h"
 class ofxGrblSettings{
 	// About Grbl Settings
 	//	https://github.com/grbl/grbl/wiki/Configuring-Grbl-v0.9

@@ -8,6 +8,24 @@
 
 #pragma once
 
+
+enum ofxGrblMode{
+	OFXGRBL_SPINDLE,
+	OFXGRBL_LASER,
+	OFXGRBL_PLOTTER
+} ;
+
+enum ofxGrblUnits{
+	OFXGRBL_MILLIMETERS,
+	OFXGRBL_INCHES
+};
+
+enum ofxGrblPositionMode {
+	OFXGRBL_ABSOLUTE,
+	OFXGRBL_RELATIVE
+};
+
+
 // The following defines have been taken from the GRBL firmware. These are returned by the machine in case of error, alarm or debuging.
 // https://github.com/grbl/grbl/blob/master/grbl/report.h
 

@@ -23,7 +23,7 @@ void device::setup(string _port, int _baudrate, const std::string& settingsFileN
 	
 	// param
 	isReadyToSend = true;
-	isPause = false;
+//	isPause = false;
 	
 	firstTimeLoad = true;
 	
@@ -63,9 +63,9 @@ void device::update(ofEventArgs&) {
 						//sentCount--;
 						//ofLogVerbose(" ofxGrbl ") << "Sent: " << sentCount ;
 					}else
-					if (readBuffer == "error: Unsupported command") {
-						ofLogVerbose(" ofxGrbl ") << "[ PAUSED ]" ;
-						isPause = true;
+					if (readBuffer.substr(0,6) == "error:") {
+						ofLogVerbose(" ofxGrbl ") << "[ ERROR ]" ;
+//						isPause = true;
 						isReadyToSend = true;
 					}
 					if (readBuffer[0] == '<') {
@@ -141,7 +141,7 @@ void device::update(ofEventArgs&) {
 		if (bConnected && isDeviceReady) {
 			
 			// send
-			if (isReadyToSend && !isPause) {
+			if (isReadyToSend){// && !isPause) {
 				if (sendQueList.size() > 0) {
 					sendMessage(sendQueList[0], true);
 					
@@ -154,26 +154,11 @@ void device::update(ofEventArgs&) {
 		}
 //	}
 }
-
-//--------------------------------------------------------------
-//void device::saveOutBuffer( const std::string& path){
-//	
-//	if (sendQueList.size() > 0) {
-//		std::cout << "sendQueList size : " << sendQueList.size()  << std::endl;
-//		for(auto& l: sendQueList){
-//			outputBuffer.append(l + "\n");
-//		}
-//		sendQueList.clear();
-//	
-//		std::cout << "ofxGrbl::device::saveOutBuffer << " << path << std::endl;
-//		ofBufferToFile(path, outputBuffer, false);
-//	}
-//}
 //--------------------------------------------------------------
 void device::close() {
 	if (bConnected) {
 		if (bSpindle) enableSpindle(false, true);
-		sendMessage("G90 G0 X0 Y0 Z0", true);
+//		sendMessage("G90 G0 X0 Y0 Z0", true);
 	}
 }
 
@@ -265,18 +250,21 @@ void device::send(const ofPolyline& poly){
 }
 //--------------------------------------------------------------
 void device::send(const std::vector<glm::vec3>& p){
-	sendUnits();
+
 	
 	if(p.size()> 0){
 		sendMessage(getPositionModeString(OFXGRBL_ABSOLUTE));
 		if (_settings.mode == OFXGRBL_PLOTTER) {
 			sendMessage("G0 Z1.0");//bring pen up
 			setPosition({p[0].x, p[0].y, 1}, true);//set the position t the first polyline vertex
-			sendMessage("G1 Z0.0 F"+ ofToString(_settings.speed->z));//bring pen down
+			sendMessage("G1 Z0.0" + getFeedRateString(_settings.speed->z));//bring pen down
 		}else{
 			setPosition({p[0].x, p[0].y, 1}, true);//set the position t the first polyline vertex
 		}
-		sendMessage("G1 F"+ ofToString(_settings.speed->x));//set the feedrate(speed) of all subsequent moves
+		auto fr =  getFeedRateString(_settings.speed->x);
+		if(!fr.empty()){
+			sendMessage("G1" + fr);//set the feedrate(speed) of all subsequent moves
+		}
 		for(size_t i = 1; i < p.size(); i++){
 			sendMessage("G1" + vec3ToGcode(p[i], areaRect));
 		}
@@ -370,6 +358,12 @@ void device::loadSettings(const std::string& settingsFileName) {
 		this->settingsFileName = settingsFileName;
 	}
 	areaRect.set(0,0, _settings.maxTravel->x, _settings.maxTravel->y);
+	settingsListeners.unsubscribeAll();
+	
+	settingsListeners.push(_settings.units.newListener([&](ofxGrblUnits&){
+		sendUnits();
+	}));
+	
 	if(_settings.load(this->settingsFileName)){
 		sendSettings();
 		if (firstTimeLoad) {
@@ -381,7 +375,6 @@ void device::loadSettings(const std::string& settingsFileName) {
 }
 //--------------------------------------------------------------
 void device::sendSettings() {
-	
 	
 	sendMessage("$0=" + ofToString(_settings.stepPulse.get() ));
 	sendMessage("$1=" + ofToString(_settings.stepIdleDelay.get() ));
@@ -405,20 +398,12 @@ void device::sendSettings() {
 	sendMessage("$30=" + ofToString(_settings.maxSpindleSpeed .get(), OFX_GRBL_FLOAT_RES));
 	sendMessage("$31=" + ofToString(_settings.minSpindleSpeed .get(), OFX_GRBL_FLOAT_RES));
 	
-	
-	//	OFXGRBL_SPINDLE,
-	//	OFXGRBL_LASER,
-	//	OFXGRBL_PLOTTER
-	if (_settings.mode == OFXGRBL_LASER) {
+	if (_settings.mode != OFXGRBL_SPINDLE) {
 		sendMessage("$32=1");
 	}else {
 		sendMessage("$32=0");
 	}
-	// set spindle speed
-	sendMessage("S" + ofToString((int)_settings.spindleSpeed));
-	
 	// set max speed
-	//	sendMessage("F" +     ofToString(_settings.maxSpeed->x, 4));
 	sendMessage("$110=" + ofToString(_settings.maxSpeed->x, OFX_GRBL_FLOAT_RES));
 	sendMessage("$111=" + ofToString(_settings.maxSpeed->y, OFX_GRBL_FLOAT_RES));
 	sendMessage("$112=" + ofToString(_settings.maxSpeed->z, OFX_GRBL_FLOAT_RES));
@@ -430,8 +415,6 @@ void device::sendSettings() {
 	sendMessage("$130=" + ofToString(_settings.maxTravel->x, OFX_GRBL_FLOAT_RES));
 	sendMessage("$131=" + ofToString(_settings.maxTravel->y, OFX_GRBL_FLOAT_RES));
 	sendMessage("$132=" + ofToString(_settings.maxTravel->z, OFX_GRBL_FLOAT_RES));
-	
-	//	setArea(_settings.maxTravel->x, _settings.maxTravel->y);
 }
 //--------------------------------------------------------------
 void device::sendUnits(){
@@ -451,6 +434,7 @@ void device::clear() {
 void device::setHome(const glm::vec3& _homePos) {
 	ofLogVerbose(" ofxGrbl ") << "setHome(" << _homePos << ")" ;
 	_settings.homePosition = _homePos;
+	
 	sendMessage("G90 G0 X" + ofToString(_settings.homePosition->x) + " Y" + ofToString(_settings.homePosition->y) + " Z" + ofToString(_settings.homePosition->z), true);
 }
 //--------------------------------------------------------------
@@ -513,7 +497,14 @@ void device::setSpindleSpeed(int _speed, bool _direct) {
 	}
 }
 //--------------------------------------------------------------
-string device::getPositionModeString(PositionMode newMode){
+void device::setUnits(ofxGrblUnits newUnits){
+	if(_settings.units.get() != newUnits){
+		_settings.units = newUnits;
+//		sendUnits(); // send is going to happen implicitly as there is a listener for _settings.units that will send it
+	}
+}
+//--------------------------------------------------------------
+string device::getPositionModeString(ofxGrblPositionMode newMode){
 	if(positionMode != newMode){
 		positionMode = newMode;
 		switch(positionMode){
@@ -524,33 +515,48 @@ string device::getPositionModeString(PositionMode newMode){
 	return "";
 }
 //--------------------------------------------------------------
-void device::setPosition(const glm::vec3& _pos, bool bRapidMovement) {
-	string msg = getPositionModeString(OFXGRBL_ABSOLUTE);
+string device::getFeedRateString(const float& newFeedrate){
+	if(!ofIsFloatEqual(newFeedrate, lastFeedRateSent)){
+		lastFeedRateSent = newFeedrate;
+		return " F"+ ofToString(lastFeedRateSent);
+	}
+	return "";
+}
+//--------------------------------------------------------------
+void device::setPosition(const glm::vec3& _pos, bool bRapidMovement, bool _sendDirect, ofxGrblPositionMode _positionMode) {
+	string msg = getPositionModeString(_positionMode);
+	msg += (string)(bRapidMovement?"G0":"G1"); // send rapid or nonrapid movement command
+	msg += vec3ToGcode(_pos, areaRect);// send position
+	msg += getFeedRateString(_settings.speed->x);// send feedrate
 	
-	sendMessage(msg + (string)(bRapidMovement?"G0":"G1") + vec3ToGcode(_pos, areaRect) +  " F"+ ofToString(_settings.speed->x), false);
-				//+ " X" + ofToString(_pos.x) + " Y" + ofToString(_pos.y) + " Z" + ofToString(_pos.z) x
+	sendMessage(msg, _sendDirect);
 }
 //--------------------------------------------------------------
 void device::moveRight(float _mm) {
-	sendMessage("G91 G1 X" + ofToString(_mm) + " Y0 Z0 F"+ ofToString(_settings.speed->x), true);
+//	string msg = getPositionModeString(OFXGRBL_RELATIVE);
+//	msg += "G1";
+//	msg += vec3ToGcode({_mm, 0, 0}, areaRect);// send position
+//	msg += getFeedRateString(_settings.speed->x);// send feedrate
+//	
+//	sendMessage(msg, true);
+	setPosition({_mm, 0, 0}, false, true,  OFXGRBL_RELATIVE);
 }
 //--------------------------------------------------------------
 void device::moveLeft(float _mm) {
-	sendMessage("G91 G1 X" + ofToString(-_mm) + " Y0 Z0 F"+ ofToString(_settings.speed->x), true);
+	moveRight(-_mm);
 }
 //--------------------------------------------------------------
 void device::moveUp(float _mm) {
-	sendMessage("G91 G1 X0 Y" + ofToString(_mm) + " Z0  F"+ ofToString(_settings.speed->y), true);
+	setPosition({ 0, _mm, 0}, false, true,  OFXGRBL_RELATIVE);
+//	string msg = getPositionModeString(OFXGRBL_RELATIVE);
+//	msg += "G1"; // send rapid movement command
+//	msg += vec3ToGcode({0, _mm, 0}, areaRect);// send position
+//	msg += getFeedRateString(_settings.speed->y);// send feedrate
+//	
+//	sendMessage(msg, true);
+
 }
 //--------------------------------------------------------------
 void device::moveDown(float _mm) {
-	sendMessage("G91 G1 X0 Y" + ofToString(-_mm) + " Z0  F"+ ofToString(_settings.speed->y), true);
+	moveUp(-_mm);
 }
-////--------------------------------------------------------------
-//const vector<vector<glm::vec3>> & device::getStrokeList() const{
-//	return strokeList;
-//}
-////--------------------------------------------------------------
-//vector<vector<glm::vec3>> & device::getStrokeList(){
-//	return strokeList;
-//}

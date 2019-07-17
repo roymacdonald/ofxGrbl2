@@ -54,7 +54,7 @@ public:
 	void moveUp(float _mm);
 	void moveDown(float _mm);
 	
-	void setPosition(const glm::vec3& _pos, bool bRapidMovement = false);
+	void setPosition(const glm::vec3& _pos, bool bRapidMovement = false, bool _sendDirect = false, ofxGrblPositionMode positionMode = OFXGRBL_ABSOLUTE);
 	
 	// Settings
 	void saveSettings(const std::string& settingsFileName = "");
@@ -73,11 +73,9 @@ public:
 	void send(const std::vector<glm::vec3>& points, float z);
 	
 	
-	// paths
-//	glm::vec3 prevPos;
-//	glm::vec3 targetPos;
-	glm::vec3 currentPos;
-	
+	/// sets the device to use either millimeters or inches as the units being used for the commands. Default is millimeters
+	/// Possible parameters passed are either OFXGRBL_MILLIMETERS or OFXGRBL_INCHES
+	void setUnits(ofxGrblUnits newUnits);
 	
 	
 	// events
@@ -86,14 +84,9 @@ public:
 	
 	ofRectangle getArea(){return areaRect;}
 	
-	
-//	const vector<vector<glm::vec3>> & getStrokeList() const;
-//	vector<vector<glm::vec3>> & getStrokeList();
-	
-	
-//	void saveOutBuffer( const std::string& path);
-	
 protected:
+	
+	glm::vec3 currentPos;
 	string settingsFileName;
 	vector<string> sendQueList;
 	ofRectangle areaRect;
@@ -112,18 +105,16 @@ protected:
 	
 private:
 	
-	enum PositionMode {
-		OFXGRBL_ABSOLUTE,
-		OFXGRBL_RELATIVE
-	}positionMode = OFXGRBL_ABSOLUTE;
 	
+	float lastFeedRateSent = 0;
+	string getFeedRateString(const float& newFeedrate);
 	
-	
-	string getPositionModeString(PositionMode newMode);
+	ofxGrblPositionMode positionMode = OFXGRBL_ABSOLUTE;
+	string getPositionModeString(ofxGrblPositionMode newMode);
 	
 	bool firstTimeLoad;
 	string status;
-	bool isPause;
+//	bool isPause;
 	bool isReadyToSend;
 	
 	string readBuffer;
@@ -132,9 +123,11 @@ private:
 	bool bSpindle = false;
 	
 	vector<ofPolyline> polylines;
-//	vector<glm::vec3> tmpStroke;
 	
 	// Grbl Settings
 	ofxGrblSettings _settings;
+	
+	ofEventListeners settingsListeners;
+	
 };
 }

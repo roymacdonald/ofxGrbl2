@@ -1,2 +1,2 @@
-ofxGrbl
+ofxGrbl2
 ofxGui
