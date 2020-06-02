@@ -2,7 +2,7 @@
 
 #include "ofMain.h"
 #include "ofxGrblDevice.h"
-
+#include "ofxGui.h"
 class ofApp : public ofBaseApp{
 
 	public:
@@ -36,4 +36,7 @@ class ofApp : public ofBaseApp{
 	
 	void addPolyVertex(float x, float y, bool bMakeNewPoly = false);
 
+	ofxPanel gui;
+	bool bAddingVertices = false;
+	
 };

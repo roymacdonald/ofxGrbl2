@@ -1,0 +1,90 @@
+<Widget>
+    <Kind>2</Kind>
+    <Name>Spindle</Name>
+    <Value>0</Value>
+</Widget>
+<Widget>
+    <Kind>2</Kind>
+    <Name>Laser</Name>
+    <Value>0</Value>
+</Widget>
+<Widget>
+    <Kind>2</Kind>
+    <Name>Plotter</Name>
+    <Value>1</Value>
+</Widget>
+<Widget>
+    <Kind>17</Kind>
+    <Name>bSpindle</Name>
+    <Value>0</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>Spindle Speed(Laser Power)</Name>
+    <Value>100.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>Push Distance</Name>
+    <Value>0.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>MAX SPEED X</Name>
+    <Value>11323.962890625</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>MAX SPEED Y</Name>
+    <Value>10000.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>MAX SPEED Z</Name>
+    <Value>10000.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>ACCEL X</Name>
+    <Value>100.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>ACCEL Y</Name>
+    <Value>100.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>ACCEL Z</Name>
+    <Value>100.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>MAX TRAVEL X</Name>
+    <Value>100.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>MAX TRAVEL Y</Name>
+    <Value>100.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>MAX TRAVEL Z</Name>
+    <Value>100.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>FEEDBACK INTERVAL</Name>
+    <Value>10.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>12</Kind>
+    <Name>PORT</Name>
+    <Value>COM3</Value>
+</Widget>
+<Widget>
+    <Kind>20</Kind>
+    <Name>PAUSE</Name>
+    <Value>1</Value>
+</Widget>
