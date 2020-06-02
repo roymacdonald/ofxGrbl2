@@ -9,6 +9,9 @@
 #pragma once
 
 
+#define OFX_GRBL_FLOAT_RES 6
+
+
 enum ofxGrblMode{
 	OFXGRBL_SPINDLE,
 	OFXGRBL_LASER,

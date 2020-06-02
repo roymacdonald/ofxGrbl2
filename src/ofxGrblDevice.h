@@ -24,21 +24,18 @@ public:
 	bool isConnected();
 	
 	
-	
 	void close();
 	
-	
+	void saveStrokesToGCodeFile(const std::string& _path);
 	void loadGCodeFromFile(const std::string& _path);
 	
 	void sendMessage(const std::string& _msg, bool direct = false);
 	
-	bool checkZisDown(const std::string& _line);
 	
 	
-	void saveStrokesToGCodeFile(const std::string& _path);
 	void clear();
 	
-	void setHome(const glm::vec3& _homePos);
+	void setOrigin(const glm::vec3& _homePos);
 	void goHome();
 	
 	void enableSpindle(bool _enable, bool _direct = false);
@@ -84,18 +81,28 @@ public:
 	
 	ofRectangle getArea(){return areaRect;}
 	
+	
+	void penUp();
+	void penDown();
+	
+	ofParameterGroup& getSettingsParams(){return _settings.parameters;}
+
+	void sendSettings();
+	
+	bool canSend(){return isReadyToSend;}
+	
 protected:
+	string vec3ToGcode( const glm::vec3& _vec);
 	
 	glm::vec3 currentPos;
 	string settingsFileName;
-	vector<string> sendQueList;
 	ofRectangle areaRect;
-//	ofBuffer outputBuffer;
+
 	void update(ofEventArgs&);
 	ofEventListener updateListener;
-//	bool bSendToFile = true;
+
 	void sendUnits();
-	void sendSettings();
+
 	
 	ofSerial serial;
 	bool bConnected;
@@ -103,7 +110,29 @@ protected:
 	string port;
 	int baudrate;
 	
+	void _closeSerial();
+	
 private:
+
+//	struct GCodeData{
+//		GCodeData(const string& _gcode): gcode(_gcode) {
+//			isXYPosCommand = false;
+//		}
+//		
+//		GCodeData(const string& _gcode, const glm::vec3& _pos, ofxGrblPositionMode _posMode = OFXGRBL_ABSOLUTE):gcode(_gcode), pos(_pos), posMode(_posMode), isXYPosCommand(true){}
+//		
+//		string gcode;
+//		
+//		bool isXYPosCommand;
+//		ofxGrblPositionMode posMode = OFXGRBL_ABSOLUTE;//OFXGRBL_RELATIVE
+//		glm::vec3 pos;
+//	
+//	};
+//	
+//	vector<GCodeData>sendQueList;//data;
+	
+	vector<string> sendQueList;
+
 	
 	
 	float lastFeedRateSent = 0;
@@ -114,7 +143,7 @@ private:
 	
 	bool firstTimeLoad;
 	string status;
-//	bool isPause;
+
 	bool isReadyToSend;
 	
 	string readBuffer;
@@ -128,6 +157,24 @@ private:
 	ofxGrblSettings _settings;
 	
 	ofEventListeners settingsListeners;
+
+	std::map<std::string, ofParameter<float>> floatParamMap;
+	std::map<std::string, ofParameter<bool>> boolParamMap;
+	std::map<std::string, ofParameter<int>> intParamMap;
+	std::map<std::string, ofParameter<glm::vec3>> vec3ParamMap;
+	
+	void readSettingString(const string& msg);
+
+	template<typename T>
+	bool setParamFromString(std::map<std::string, ofParameter<T>>& group, const string& key, const string& value)
+	{
+		if(group.count(key))
+		{
+			group[key] = ofFromString<T>(value);
+			return true;
+		}
+		return false;
+	}
 	
 };
 }

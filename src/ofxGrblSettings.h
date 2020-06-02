@@ -10,43 +10,63 @@ public:
 
 ofxGrblSettings(){
 	parameters.setName("GRBL SETTINGS");
-	parameters.add(stepPulse);
-	parameters.add(stepIdleDelay);
-	parameters.add(stepPortInvertMask);
-	parameters.add(dirPortInvertMask);
-	parameters.add(stepEnableInvert);
-	parameters.add(limitPinsInvert);
-	parameters.add(probePinInvert);
-	parameters.add(statusReportMask);
-	parameters.add(junctionDeviat);
-	parameters.add(arcTolerance);
-	parameters.add(reportInches);
-	parameters.add(softLimits);
-	parameters.add(hardLimits);
-	parameters.add(homingCycles);
-	parameters.add(homingDirInver);
-	parameters.add(homingFeed);
-	parameters.add(homingSeek);
-	parameters.add(homingDebounce);
-	parameters.add(homingPullOff);
-	parameters.add(homePosition);
-	parameters.add(step);
-	parameters.add(maxTravel);
-//	parameters.add(stepParMillimeter);
-	parameters.add(accel);
-	parameters.add(maxSpeed);
-//	parameters.add(stepInvertX);
-//	parameters.add(stepInvertY);
-//	parameters.add(stepInvertZ);
-	parameters.add(mode);
-	parameters.add(spindleSpeed);
-	parameters.add(maxSpindleSpeed);
-	parameters.add(minSpindleSpeed);
-//	parameters.add(laserModeEnable);
-	parameters.add(isUseZAxis);
-	parameters.add(upPos);
-	parameters.add(downPos);
+	
+	steppersParams.setName("Steppers");
+	homingParams.setName("Homing");
+	limitsParams.setName("Limits");
+	zAxisParams.setName("Z-Axis");
+	spindleParams.setName("Spindle");
+	otherParams.setName("Other");
+	
+	steppersParams.add(stepPulse);
+	steppersParams.add(stepIdleDelay);
+	steppersParams.add(stepPortInvertMask);
+	steppersParams.add(dirPortInvertMask);
+	steppersParams.add(stepEnableInvert);
+	steppersParams.add(step);
+	steppersParams.add(accel);
+	steppersParams.add(maxSpeed);
+	steppersParams.add(speed);
 
+	otherParams.add(probePinInvert);
+	otherParams.add(statusReportMask);
+	otherParams.add(junctionDeviat);
+	otherParams.add(arcTolerance);
+	otherParams.add(reportInches);
+
+	limitsParams.add(limitPinsInvert);
+	limitsParams.add(softLimits);
+	limitsParams.add(hardLimits);
+
+	homingParams.add(homingCycles);
+	homingParams.add(homingDirInver);
+	homingParams.add(homingFeed);
+	homingParams.add(homingSeek);
+	homingParams.add(homingDebounce);
+	homingParams.add(homingPullOff);
+
+	spindleParams.add(spindleSpeed);
+	spindleParams.add(maxSpindleSpeed);
+	spindleParams.add(minSpindleSpeed);
+//	parameters.add(laserModeEnable);
+	zAxisParams.add(isUseZAxis);
+	zAxisParams.add(upPos);
+	zAxisParams.add(downPos);
+
+
+	parameters.add(origin);
+	
+	parameters.add(maxTravel);
+
+	parameters.add(mode);
+
+
+	parameters.add(steppersParams);
+	parameters.add(homingParams);
+	parameters.add(limitsParams);
+	parameters.add(zAxisParams);
+	parameters.add(spindleParams);
+	parameters.add(otherParams);
 
 
 }
@@ -98,7 +118,9 @@ ofxGrblSettings(){
 			10000,  //$110 (x max rate, mm/min)
 			10000, 	//$111 (y max rate, mm/min)
 			1000	//$112 (z max rate, mm/min)
-		}
+		},
+		{0.,0.,0.},
+		{20000.,20000.,20000.}
 	};
 	
 	ofParameter<glm::vec3> speed = {"Speed",
@@ -106,11 +128,13 @@ ofxGrblSettings(){
 			8000,
 			8000,
 			100
-		}
+		},
+		{0.,0.,0.},
+		{20000.,20000.,20000.}
 	};
 	
 	
-	ofParameter<glm::vec3> homePosition = {"Home Position", {0.0f,0.0f,0.0f}}; 
+	ofParameter<glm::vec3> origin = {"Home Position", {0.0f,0.0f,0.0f}};
 
 	// Accelaration
 	// Per axis acceleration. Used for motion planning to not exceed motor torque and lose steps. 
@@ -120,7 +144,9 @@ ofxGrblSettings(){
 			400.0, 	//$120 (X-axis acceleration, mm/sec^2)
 			400.0,  //$121 (Y-axis acceleration, mm/sec^2)
 			1000.0	//$122 (Z-axis acceleration, mm/sec^2)
-		}
+		},
+		{0.,0.,0.},
+		{20000.,20000.,20000.}
 	};
 
 	// Max Travel
@@ -157,8 +183,12 @@ ofxGrblSettings(){
 
 
 	ofParameterGroup parameters;
-
-	
+	ofParameterGroup steppersParams;
+	ofParameterGroup homingParams;
+	ofParameterGroup limitsParams;
+	ofParameterGroup zAxisParams;
+	ofParameterGroup spindleParams;
+	ofParameterGroup otherParams;
 	//--------------------------------------------------------------
 	void save(const std::string& settingsFileName) {
 		ofLogVerbose(" ofxGrbl ") << "saveSettings to " << settingsFileName ;
