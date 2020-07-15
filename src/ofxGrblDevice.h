@@ -11,18 +11,76 @@
 
 #include "ofMain.h"
 #include "ofxGrblSettings.h"
+#include "ofxDropdown.h"
+#include "ofxGui.h"
+
+
 
 namespace ofxGrbl{
+
+class device;
+
+template <typename T>
+class parameter
+{
+public:
+	parameter(){}
+	void setup(device* parentDevice, const std::string& addr, ofParameter<T>& mom)
+	{
+		address = addr;
+		_parentDevice = parentDevice;
+		
+		param.makeReferenceTo(mom);
+		listener = make_unique<ofEventListener>(param.newListener(this, &parameter::paramChanged));
+	}
+	std::string address;
+	ofParameter<T> param;
+	unique_ptr<ofEventListener> listener = nullptr;
+	
+	void setWithoutEventNotifications(T value)
+	{
+		_bDontSend = true;
+		param = value;
+		_bDontSend = false;
+	}
+	
+	void paramChanged(T&)
+	{
+		if(!_bDontSend)
+			send();
+	}
+	
+	void send();
+	
+private:
+	
+	const bool _isFloat = std::is_floating_point<T>::value;
+	
+	device* _parentDevice = nullptr;
+
+	bool _bDontSend = false;
+	
+	
+	
+};
+
+
 class device{
 	
 public:
 	
-	void setup(string _port = "", int _baudrate = -1, const std::string& settingsFileName = "ofxGrblSettings.xml");
+	device();
+	
+	void setup();
+	
+	void setup(string _port);
 	
 	// serial
-	void connect(string _port = "", int _baudrate = -1);
+	void connect();
+	void connect(string _port);
 	bool isConnected();
 	
+	vector<std::string> getAvailablePorts();
 	
 	void close();
 	
@@ -87,11 +145,28 @@ public:
 	
 	ofParameterGroup& getSettingsParams(){return _settings.parameters;}
 
+	ofxGrblSettings& getSettings(){return _settings;}
+	
 	void sendSettings();
 	
 	bool canSend(){return isReadyToSend;}
 	
+	
+	ofxPanel gui;
+	
+	
 protected:
+	
+	std::unique_ptr<ofxDropdown> ports = nullptr;
+//	std::unique_ptr<ofxIntDropdown> baudrates = nullptr;
+	
+	void portChanged(std::string& port);
+//	void baudrateChanged(int& bd);
+	ofEventListeners dropdownListeners;
+	
+	void populatePortsDropdown();
+//	void populateBaudratesDropdown();
+	
 	string vec3ToGcode( const glm::vec3& _vec);
 	
 	glm::vec3 currentPos;
@@ -107,41 +182,31 @@ protected:
 	ofSerial serial;
 	bool bConnected;
 	bool isDeviceReady;
-	string port;
-	int baudrate;
+	ofParameter<string> port = {"port", ""};
+//	ofParameter<int> baudrate = {"baudrate", 115200, 300, 12000000};
+
+	int baudrate = 115200;
 	
 	void _closeSerial();
 	
 private:
-
-//	struct GCodeData{
-//		GCodeData(const string& _gcode): gcode(_gcode) {
-//			isXYPosCommand = false;
-//		}
-//		
-//		GCodeData(const string& _gcode, const glm::vec3& _pos, ofxGrblPositionMode _posMode = OFXGRBL_ABSOLUTE):gcode(_gcode), pos(_pos), posMode(_posMode), isXYPosCommand(true){}
-//		
-//		string gcode;
-//		
-//		bool isXYPosCommand;
-//		ofxGrblPositionMode posMode = OFXGRBL_ABSOLUTE;//OFXGRBL_RELATIVE
-//		glm::vec3 pos;
-//	
-//	};
-//	
-//	vector<GCodeData>sendQueList;//data;
+	
+	
+	bool bIgnorePortChange = false;
+	
 	
 	vector<string> sendQueList;
 
 	
 	
-	float lastFeedRateSent = 0;
-	string getFeedRateString(const float& newFeedrate);
+	float lastFeedRateSent[2] = {0.0, 0.0};
+	
+	string getFeedRateString(const float& newFeedrate, bool bRapidMovement);
 	
 	ofxGrblPositionMode positionMode = OFXGRBL_ABSOLUTE;
 	string getPositionModeString(ofxGrblPositionMode newMode);
 	
-	bool firstTimeLoad;
+//	bool firstTimeLoad;
 	string status;
 
 	bool isReadyToSend;
@@ -158,23 +223,64 @@ private:
 	
 	ofEventListeners settingsListeners;
 
-	std::map<std::string, ofParameter<float>> floatParamMap;
-	std::map<std::string, ofParameter<bool>> boolParamMap;
-	std::map<std::string, ofParameter<int>> intParamMap;
-	std::map<std::string, ofParameter<glm::vec3>> vec3ParamMap;
+	std::map<std::string, parameter<float>> floatParamMap;
+	std::map<std::string, parameter<bool>> boolParamMap;
+	std::map<std::string, parameter<int>> intParamMap;
+	std::map<std::string, parameter<glm::vec3>> vec3ParamMap;
 	
 	void readSettingString(const string& msg);
 
 	template<typename T>
-	bool setParamFromString(std::map<std::string, ofParameter<T>>& group, const string& key, const string& value)
+	bool setParamFromString(std::map<std::string, parameter<T>>& group, const string& key, const string& value)
 	{
 		if(group.count(key))
 		{
-			group[key] = ofFromString<T>(value);
+			group[key].setWithoutEventNotifications(ofFromString<T>(value));
 			return true;
 		}
 		return false;
 	}
 	
+	template<>
+	bool setParamFromString<glm::vec3>(std::map<std::string, parameter<glm::vec3>>& group, const string& key, const string& value)
+	{
+//		if(group.count(key))
+//		{
+			if(key.size() == 4)
+			{
+				auto k = key.substr(0, key.size()-1)+"0";
+//				cout <<"key: " << key <<  " k: " << k << "\n";
+				if(group.count(k))
+				{
+					auto v = vec3ParamMap[k].param.get();
+					string s;
+					s +=key.back();
+//					cout << "s " << s << "\n";
+					v[ofToInt(s)] = ofToFloat(value);
+					vec3ParamMap[k].setWithoutEventNotifications(v);
+					return true;
+				}
+			}
+			
+			
+//			group[key].param.setWithoutEventNotifications(ofFromString<glm::vec3>(value));
+//			return true;
+//		}
+		return false;
+	}
+	
+	
+	
+	
+	template<typename T>
+	void addToMap(std::map<std::string, parameter<T>> & paramMap, const std::string& addr, ofParameter<T>& param)
+	{
+		paramMap[addr].setup(this, addr, param);
+	}
+
 };
+
+
+
+
 }

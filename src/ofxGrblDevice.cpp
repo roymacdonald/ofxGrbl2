@@ -10,68 +10,156 @@
 #include "ofxGrblUtils.h"
 namespace ofxGrbl{
 
+template <typename T>
+void parameter<T>::send()
+{
+	if(_parentDevice){
+		if(_isFloat){
+			_parentDevice->sendMessage(address+"=" + ofToString(param.get(), OFX_GRBL_FLOAT_RES));
+		}
+		else
+		{
+			_parentDevice->sendMessage(address+"=" + ofToString(param.get()));
+		}
+	}
+}
+
+template <>
+void parameter<glm::vec3>::send()
+{
+	if(_parentDevice){
+
+		string addr = address.substr(0, address.size()-1);
+		
+		 _parentDevice->sendMessage( addr + "0=" + ofToString(param->x, OFX_GRBL_FLOAT_RES));
+		 _parentDevice->sendMessage( addr + "1=" + ofToString(param->y, OFX_GRBL_FLOAT_RES));
+		 _parentDevice->sendMessage( addr + "2=" + ofToString(param->z, OFX_GRBL_FLOAT_RES));
+		
+	}
+}
+
 //--------------------------------------------------------------
-void device::setup(string _port, int _baudrate, const std::string& settingsFileName) {
-	ofLogVerbose("ofxGrbl::device::setup");
+device::device()
+{
 	
+	addToMap(vec3ParamMap, "$110", _settings.maxSpeed);
+	addToMap(vec3ParamMap, "$120", _settings.accel);
+	addToMap(vec3ParamMap, "$130", _settings.maxTravel);
+
+	addToMap(intParamMap, "$0", _settings.stepPulse);
+	addToMap(intParamMap, "$1", _settings.stepIdleDelay);
+	addToMap(intParamMap, "$2", _settings.stepPortInvertMask);
+	addToMap(intParamMap, "$3", _settings.dirPortInvertMask);
+	addToMap(intParamMap, "$10", _settings.statusReportMask);
+	addToMap(intParamMap, "$23", _settings.homingDirInver);
+	addToMap(intParamMap, "$26", _settings.homingDebounce);
+
+
+	addToMap(boolParamMap, "$4", _settings.stepEnableInvert);
+	addToMap(boolParamMap, "$5", _settings.limitPinsInvert);
+	addToMap(boolParamMap, "$6", _settings.probePinInvert);
+	addToMap(boolParamMap, "$13", _settings.reportInches);
+	addToMap(boolParamMap, "$20", _settings.softLimits);
+	addToMap(boolParamMap, "$21", _settings.hardLimits);
+	addToMap(boolParamMap, "$22", _settings.homingCycles);
+	
+	addToMap(floatParamMap, "$11", _settings.junctionDeviat);
+	addToMap(floatParamMap, "$12", _settings.arcTolerance);
+	addToMap(floatParamMap, "$24", _settings.homingFeed);
+	addToMap(floatParamMap, "$25", _settings.homingSeek);
+	addToMap(floatParamMap, "$27", _settings.homingPullOff);
+	addToMap(floatParamMap, "$30", _settings.maxSpindleSpeed);
+	addToMap(floatParamMap, "$31", _settings.minSpindleSpeed);
+
 	readBuffer = "";
 	status = "";
+	updateListener = ofEvents().update.newListener(this, &ofxGrbl::device::update);
 	
-	// param
 	isReadyToSend = true;
-	//	isPause = false;
-	
-	firstTimeLoad = true;
+	bConnected = false;
+	isDeviceReady = false;
+}
+
+//--------------------------------------------------------------
+void device::setup() {
+	ofLogVerbose("ofxGrbl::device::setup");
 	
 	// serial
 	serial.listDevices();
-	bConnected = false;
-	isDeviceReady = false;
 	
-	connect(_port, _baudrate);
+	gui.setup("GRBL", "ofxGrblSettings.xml");
+	ports = std::make_unique<ofxDropdown>(port);
 	
-	loadSettings(settingsFileName);
-	
-	updateListener = ofEvents().update.newListener(this, &ofxGrbl::device::update);
+	ports->enableCollapseOnSelection();
+	ports->disableMultipleSelection();
 
 	
+	ports->addListener(this, &device::portChanged);
 	
-	vec3ParamMap["$110"].makeReferenceTo(_settings.maxSpeed);
-	vec3ParamMap["$120"].makeReferenceTo(_settings.accel);
-	vec3ParamMap["$130"].makeReferenceTo(_settings.maxTravel);
-
-	intParamMap["$0"].makeReferenceTo(_settings.stepPulse);
-	intParamMap["$1"].makeReferenceTo(_settings.stepIdleDelay);
-	intParamMap["$2"].makeReferenceTo(_settings.stepPortInvertMask);
-	intParamMap["$3"].makeReferenceTo(_settings.dirPortInvertMask);
-	intParamMap["$10"].makeReferenceTo(_settings.statusReportMask);
-	intParamMap["$23"].makeReferenceTo(_settings.homingDirInver);
-	intParamMap["$26"].makeReferenceTo(_settings.homingDebounce);
-
-
-	boolParamMap["$4"].makeReferenceTo(_settings.stepEnableInvert);
-	boolParamMap["$5"].makeReferenceTo(_settings.limitPinsInvert);
-	boolParamMap["$6"].makeReferenceTo(_settings.probePinInvert);
-	boolParamMap["$13"].makeReferenceTo(_settings.reportInches);
-	boolParamMap["$20"].makeReferenceTo(_settings.softLimits);
-	boolParamMap["$21"].makeReferenceTo(_settings.hardLimits);
-	boolParamMap["$22"].makeReferenceTo(_settings.homingCycles);
+//	std::vector<int> bauds = {300, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400, 12000000};
 	
-	floatParamMap["$11"].makeReferenceTo(_settings.junctionDeviat);
-	floatParamMap["$12"].makeReferenceTo(_settings.arcTolerance);
-	floatParamMap["$24"].makeReferenceTo(_settings.homingFeed);
-	floatParamMap["$25"].makeReferenceTo(_settings.homingSeek);
-	floatParamMap["$27"].makeReferenceTo(_settings.homingPullOff);
-	floatParamMap["$30"].makeReferenceTo(_settings.maxSpindleSpeed);
-	floatParamMap["$31"].makeReferenceTo(_settings.minSpindleSpeed);
+//	baudrates = std::make_unique<ofxIntDropdown>(baudrate, bauds);
+//
+//	baudrates->addListener(this, &device::baudrateChanged);
 	
-
+	
+	gui.add(ports.get());
+//	gui.add(baudrates.get());
+	
+	gui.add(getSettingsParams());
+	
+	
+	dropdownListeners.push(ports->dropdownWillShow_E.newListener(this, &device::populatePortsDropdown));
 
 	
 	
 }
 
+//--------------------------------------------------------------
+void device::populatePortsDropdown()
+{
+	if(ports)
+	{
+		ports->clear();
+		ports->add(getAvailablePorts());
+	}
+}
+void device::portChanged(std::string& p)
+{
+	if(bIgnorePortChange ) return;
+	connect();
+}
+//void device::baudrateChanged(int& bd)
+//{
+//	if(bIgnorePortChange ) return;
+//	connect();
+//}
 
+
+//--------------------------------------------------------------
+void device::setup(string _port) {
+
+	setup();
+	
+	connect(_port);
+	
+
+
+	
+}
+
+vector<std::string> device::getAvailablePorts()
+{
+
+	vector<std::string> p;
+	
+	auto devs = serial.getDeviceList();
+	for(auto& d: devs)
+	{
+		p.push_back(d.getDevicePath());
+	}
+	return p;
+}
 
 //--------------------------------------------------------------
 void device::readSettingString(const string& msg)
@@ -82,49 +170,14 @@ void device::readSettingString(const string& msg)
 		auto key = msg.substr(0, p);
 		auto value = msg.substr(p+1);
 	
-
-
-		if(!setParamFromString(floatParamMap, key, value)){
-			if(!setParamFromString(boolParamMap, key, value)){
-				if(!setParamFromString(intParamMap, key, value)){
-					if(key.size() == 4)
-					{
-						auto k = key.substr(0, key.size()-1)+"0";
-						cout << "k: " << k << "\n";
-						if(vec3ParamMap.count(k))
-						{
-							auto v = vec3ParamMap[k].get();
-							string s;
-							s +=key.back();
-							cout << "s " << s << "\n";
-							v[ofToInt(s)] = ofToFloat(value);
-							vec3ParamMap[k] = v;
-						}
-					}
-					
-					
-				}
-			}
-		}
-
-//		if(paramMap.count(key))
-//		{
-//			if(paramMap[key])
-//			{
-//				auto t = paramMap[key]->valueType();
-//				if(t == typeid(float).name())
-//				{
-//					auto k = dynamic_cast<ofParameter<float>*>(paramMap[key]);
-//					if(k)
-//					{
-//					 k-> ofFromString<float>(value);
-//					}
-//				}
-//			}
-//		}
-//
-	}
+		if(setParamFromString(floatParamMap , key , value)){ return;}
+		if(setParamFromString(boolParamMap  , key , value)){ return;}
+		if(setParamFromString(intParamMap   , key , value)){ return;}
+		if(setParamFromString(vec3ParamMap  , key , value)){ return;}
 	
+		ofLogVerbose("ofxGrbl::device::readSettingString") << "could not read setting string: " + msg ;
+	
+	}
 }
 
 
@@ -157,9 +210,14 @@ void device::update(ofEventArgs&) {
 							//ofLogVerbose(" ofxGrbl ") << "Sent: " << sentCount ;
 					}else
 					if (readBuffer.substr(0,6) == "error:") {
-								ofLogVerbose(" ofxGrbl ") << "[ " << readBuffer << " ]" ;
+								ofLogVerbose(" ofxGrbl ") << "[ ERROR : " << getGrblStatusString(ofToInt(readBuffer.substr(6))) << " ]" ;
+							
+//						ofLogVerbose(" ofxGrbl ") << "[ ERROR ]";
 								//						isPause = true;
 								isReadyToSend = true;
+					}else if (readBuffer.substr(0,6) == "ALARM:") {
+							ofLogVerbose(" ofxGrbl ") << "[ ALARM : " << getGrblAlarmString(ofToInt(readBuffer.substr(6))) << " ]" ;
+							
 					}
 					if (readBuffer[0] == '<') {
 						// parse grbl state message
@@ -328,13 +386,15 @@ void device::send(const std::vector<glm::vec3>& p){
 	if(p.size()> 0){
 		sendMessage(getPositionModeString(OFXGRBL_ABSOLUTE));
 		if (_settings.mode == OFXGRBL_PLOTTER) {
-			sendMessage("G0 Z1.0");//bring pen up
+//			sendMessage("G0 Z1.0");//bring pen up
+			penUp();
 			setPosition({p[0].x, p[0].y, 1}, true);//set the position t the first polyline vertex
-			sendMessage("G1 Z0.0" + getFeedRateString(_settings.speed->z));//bring pen down
+//			sendMessage("G1 Z0.0" + getFeedRateString(_settings.speed->z, false));//bring pen down
+			penDown();
 		}else{
 			setPosition(p[0], true);//set the position t the first polyline vertex
 		}
-		auto fr =  getFeedRateString(_settings.speed->x);
+		auto fr =  getFeedRateString(_settings.speed->x, false);
 		if(!fr.empty()){
 			sendMessage("G1" + fr);//set the feedrate(speed) of all subsequent moves
 		}
@@ -377,17 +437,15 @@ void device::send(const std::vector<glm::vec3>& points, float z){
 
 //--------------------------------------------------------------
 void device::sendMessage(const std::string& _msg, bool direct) {
-	cout << _msg << endl;
+//	cout << _msg << endl;
 	if (direct) {
 		if (bConnected) {
 			if (_msg != "") {
-				
-				
-				
+
 				string _message = _msg + "\n";
 				unsigned char* writeByte = (unsigned char*)_message.c_str();
 				serial.writeBytes(writeByte, _message.length());
-				ofLogVerbose(" ofxGrbl::device::sendMessage()") << _message;
+				ofLogVerbose(" ofxGrbl::device::sendMessage()") << _msg;
 			}else {
 				ofLogVerbose(" ofxGrbl ") << "sendMessage() : Message is empty." ;
 			}
@@ -403,11 +461,11 @@ void device::sendMessage(const std::string& _msg, bool direct) {
 }
 //--------------------------------------------------------------
 void device::penUp(){
-	sendMessage("G1 Z1.0" + getFeedRateString(_settings.speed->z));//bring pen down
+	sendMessage("G1 Z1.0" + getFeedRateString(_settings.speed->z, false));//bring pen down
 }
 //--------------------------------------------------------------
 void device::penDown(){
-	sendMessage("G1 Z0.0" + getFeedRateString(_settings.speed->z));//bring pen down
+	sendMessage("G1 Z0.0" + getFeedRateString(_settings.speed->z, false));//bring pen down
 }
 //--------------------------------------------------------------
 void device::saveSettings(const std::string& settingsFileName) {
@@ -430,52 +488,33 @@ void device::loadSettings(const std::string& settingsFileName) {
 	
 	if(_settings.load(this->settingsFileName)){
 		sendSettings();
-		if (firstTimeLoad) {
-			ofLogVerbose(" ofxGrbl ") << "FirstTimeLoad!" ;
-			firstTimeLoad = false;
-			//			currentPos = glm::vec3(_settings.homePosition->x  * _settings.maxTravel->x, _settings.homePosition->y  * _settings.maxTravel->y, _settings.homePosition->z  * _settings.maxTravel->z);
-		}
+//		if (firstTimeLoad) {
+//			ofLogVerbose(" ofxGrbl ") << "FirstTimeLoad!" ;
+//			firstTimeLoad = false;
+//			//			currentPos = glm::vec3(_settings.homePosition->x  * _settings.maxTravel->x, _settings.homePosition->y  * _settings.maxTravel->y, _settings.homePosition->z  * _settings.maxTravel->z);
+//		}
 	}
 }
 //--------------------------------------------------------------
 void device::sendSettings() {
 	
-	sendMessage("$0=" + ofToString(_settings.stepPulse.get() ));
-	sendMessage("$1=" + ofToString(_settings.stepIdleDelay.get() ));
-	sendMessage("$2=" + ofToString(_settings.stepPortInvertMask.get() ));
-	sendMessage("$3=" + ofToString(_settings.dirPortInvertMask.get() ));
-	sendMessage("$4=" + ofToString(_settings.stepEnableInvert.get() ));
-	sendMessage("$5=" + ofToString(_settings.limitPinsInvert.get() ));
-	sendMessage("$6=" + ofToString(_settings.probePinInvert.get() ));
-	sendMessage("$10=" + ofToString(_settings.statusReportMask.get() ));
-	sendMessage("$11=" + ofToString(_settings.junctionDeviat .get(), OFX_GRBL_FLOAT_RES));
-	sendMessage("$12=" + ofToString(_settings.arcTolerance .get(), OFX_GRBL_FLOAT_RES));
-	sendMessage("$13=" + ofToString(_settings.reportInches.get() ));
-	sendMessage("$20=" + ofToString(_settings.softLimits.get() ));
-	sendMessage("$21=" + ofToString(_settings.hardLimits.get() ));
-	sendMessage("$22=" + ofToString(_settings.homingCycles.get() ));
-	sendMessage("$23=" + ofToString(_settings.homingDirInver.get() ));
-	sendMessage("$24=" + ofToString(_settings.homingFeed .get(), OFX_GRBL_FLOAT_RES));
-	sendMessage("$25=" + ofToString(_settings.homingSeek .get(), OFX_GRBL_FLOAT_RES));
-	sendMessage("$26=" + ofToString(_settings.homingDebounce.get() ));
-	sendMessage("$27=" + ofToString(_settings.homingPullOff .get(), OFX_GRBL_FLOAT_RES));
-	sendMessage("$30=" + ofToString(_settings.maxSpindleSpeed .get(), OFX_GRBL_FLOAT_RES));
-	sendMessage("$31=" + ofToString(_settings.minSpindleSpeed .get(), OFX_GRBL_FLOAT_RES));
-	
-	sendMessage("$32=" + (string)((_settings.mode == OFXGRBL_SPINDLE)?"0":"1"));
-	
-	// set max speed
-	sendMessage("$110=" + ofToString(_settings.maxSpeed->x, OFX_GRBL_FLOAT_RES));
-	sendMessage("$111=" + ofToString(_settings.maxSpeed->y, OFX_GRBL_FLOAT_RES));
-	sendMessage("$112=" + ofToString(_settings.maxSpeed->z, OFX_GRBL_FLOAT_RES));
-	// set accesl
-	sendMessage("$120=" + ofToString(_settings.accel->x, OFX_GRBL_FLOAT_RES));
-	sendMessage("$121=" + ofToString(_settings.accel->y, OFX_GRBL_FLOAT_RES));
-	sendMessage("$122=" + ofToString(_settings.accel->z, OFX_GRBL_FLOAT_RES));
-	// set max travel
-	sendMessage("$130=" + ofToString(_settings.maxTravel->x, OFX_GRBL_FLOAT_RES));
-	sendMessage("$131=" + ofToString(_settings.maxTravel->y, OFX_GRBL_FLOAT_RES));
-	sendMessage("$132=" + ofToString(_settings.maxTravel->z, OFX_GRBL_FLOAT_RES));
+	for(auto& p :floatParamMap)
+	{
+		p.second.send();
+	}
+	for(auto& p :boolParamMap)
+	{
+		p.second.send();
+	}
+	for(auto& p :intParamMap)
+	{
+		p.second.send();
+	}
+	for(auto& p :vec3ParamMap)
+	{
+		p.second.send();
+	}
+
 }
 //--------------------------------------------------------------
 void device::sendUnits(){
@@ -488,7 +527,6 @@ void device::sendUnits(){
 
 //--------------------------------------------------------------
 void device::clear() {
-	//	strokeList.clear();
 	sendQueList.clear();
 }
 //--------------------------------------------------------------
@@ -507,11 +545,18 @@ void device::killAlarmLock() {
 	sendMessage("$X", true);
 }
 //--------------------------------------------------------------
-void device::connect(string _port, int _baudrate) {
-	if (_port == "") _port = port;
-	if (_baudrate <= 0) _baudrate = baudrate;
+void device::connect(string _port){//}, int _baudrate) {
+	bIgnorePortChange = true;
+	port = _port;
+//	baudrate = _baudrate;
+	bIgnorePortChange = false;
+	connect();
 	
-	ofLogVerbose(" ofxGrbl ") << "Connect( " << _port << ", " << _baudrate << " )" ;
+}
+//--------------------------------------------------------------
+void device::connect() {
+	
+	ofLogVerbose(" ofxGrbl ") << "Connect( " << port.get() << ", " << baudrate << " )" ;
 	
 	// reset serial
 //	if (bConnected || isDeviceReady) {
@@ -521,12 +566,12 @@ void device::connect(string _port, int _baudrate) {
 //	}
 	_closeSerial();
 	
-	bConnected = serial.setup(_port, _baudrate);
+	bConnected = serial.setup(port.get(), baudrate);
 	if (bConnected) {
 		
-		ofLogVerbose(" ofxGrbl ") << "Connected to " << _port << "@" << _baudrate << " !" ;
+		ofLogVerbose(" ofxGrbl ") << "Connected to " << port << "@" << baudrate << " !" ;
 	} else {
-		ofLogWarning(" ofxGrbl ", "Connect") << "Can not connect. Port " << _port << " does not exists." ;
+		ofLogWarning(" ofxGrbl ", "Connect") << "Can not connect. Port " << port << " does not exists." ;
 	}
 }
 //--------------------------------------------------------------
@@ -581,20 +626,24 @@ string device::getPositionModeString(ofxGrblPositionMode newMode){
 	return "";
 }
 //--------------------------------------------------------------
-string device::getFeedRateString(const float& newFeedrate){
+string device::getFeedRateString(const float& newFeedrate, bool bRapidMovement){
 //	cout << "device::getFeedRateString  " << newFeedrate << "  " << lastFeedRateSent << "\n";
-	if(!ofIsFloatEqual(newFeedrate, lastFeedRateSent)){
-		lastFeedRateSent = newFeedrate;
-		return " F"+ ofToString(lastFeedRateSent);
-	}
-	return "";
+	
+//	int index = bRapidMovement?0:1;
+//	if(!ofIsFloatEqual(newFeedrate, lastFeedRateSent[index])){
+//		lastFeedRateSent[index] = newFeedrate;
+//		cout << "device::getFeedRateString  " << lastFeedRateSent[index] << " Rapid Movement: " << boolalpha << bRapidMovement << "\n";
+//		return " F"+ ofToString(lastFeedRateSent[index]);
+//	}
+//	return "";
+	return " F"+ ofToString(newFeedrate, OFX_GRBL_FLOAT_RES);
 }
 //--------------------------------------------------------------
 void device::setPosition(const glm::vec3& _pos, bool bRapidMovement, bool _sendDirect, ofxGrblPositionMode _positionMode) {
 	string msg = getPositionModeString(_positionMode);
 	msg += (string)(bRapidMovement?"G0":"G1"); // send rapid or nonrapid movement command
 	msg += vec3ToGcode(_pos);// send position
-	msg += getFeedRateString(_settings.speed->x);// send feedrate
+	msg += getFeedRateString(_settings.speed->x, bRapidMovement);// send feedrate
 	
 	sendMessage(msg, _sendDirect);
 }

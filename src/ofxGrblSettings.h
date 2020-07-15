@@ -115,22 +115,22 @@ ofxGrblSettings(){
 	// units : mm/min
 	ofParameter<glm::vec3> maxSpeed = {"Max Speed", 
 		{
-			10000,  //$110 (x max rate, mm/min)
-			10000, 	//$111 (y max rate, mm/min)
+			16000,  //$110 (x max rate, mm/min)
+			16000, 	//$111 (y max rate, mm/min)
 			1000	//$112 (z max rate, mm/min)
 		},
 		{0.,0.,0.},
-		{20000.,20000.,20000.}
+		{20000.,20000.,5000.}
 	};
 	
 	ofParameter<glm::vec3> speed = {"Speed",
 		{
-			8000,
-			8000,
+			14000,
+			14000,
 			100
 		},
 		{0.,0.,0.},
-		{20000.,20000.,20000.}
+		{20000.,20000.,25000.}
 	};
 	
 	
@@ -141,12 +141,12 @@ ofxGrblSettings(){
 	// units : mm/sec^2     
 	ofParameter<glm::vec3> accel = {"Acceleration", 
 		{
-			400.0, 	//$120 (X-axis acceleration, mm/sec^2)
-			400.0,  //$121 (Y-axis acceleration, mm/sec^2)
+			6000.0, 	//$120 (X-axis acceleration, mm/sec^2)
+			6000.0,  //$121 (Y-axis acceleration, mm/sec^2)
 			1000.0	//$122 (Z-axis acceleration, mm/sec^2)
 		},
 		{0.,0.,0.},
-		{20000.,20000.,20000.}
+		{10000.,10000.,50000.}
 	};
 
 	// Max Travel
