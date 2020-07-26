@@ -21,6 +21,8 @@ void parameter<T>::send()
 		{
 			_parentDevice->sendMessage(address+"=" + ofToString(param.get()));
 		}
+		
+		cout << "param sent: " << address << "=" << ofToString(param.get(), OFX_GRBL_FLOAT_RES) << "\n";
 	}
 }
 
@@ -73,7 +75,22 @@ device::device()
 
 	readBuffer = "";
 	status = "";
+	
+	areaRect.set(0,0, _settings.maxTravel->x, _settings.maxTravel->y);
+	
 	updateListener = ofEvents().update.newListener(this, &ofxGrbl::device::update);
+	exitListener = ofEvents().exit.newListener([&](ofEventArgs&){
+		this->close();
+	});
+	
+	settingsListeners.push(_settings.units.newListener([&](ofxGrblUnits&){
+		sendUnits();
+	}));
+	
+	settingsListeners.push(_settings.maxTravel.newListener([&](glm::vec3&){
+		areaRect.set(0,0, _settings.maxTravel->x, _settings.maxTravel->y);
+	}));
+	
 	
 	isReadyToSend = true;
 	bConnected = false;
@@ -205,7 +222,7 @@ void device::update(ofEventArgs&) {
 					}else
 					if (readBuffer == "ok") {
 							isReadyToSend = true;
-						cout << "ready to send\n";
+						//cout << "ready to send\n";
 							//sentCount--;
 							//ofLogVerbose(" ofxGrbl ") << "Sent: " << sentCount ;
 					}else
@@ -479,15 +496,20 @@ void device::loadSettings(const std::string& settingsFileName) {
 	if(settingsFileName != ""){
 		this->settingsFileName = settingsFileName;
 	}
-	areaRect.set(0,0, _settings.maxTravel->x, _settings.maxTravel->y);
-	settingsListeners.unsubscribeAll();
 	
-	settingsListeners.push(_settings.units.newListener([&](ofxGrblUnits&){
-		sendUnits();
-	}));
+//	settingsListeners.unsubscribeAll();
+	
+//	settingsListeners.push(_settings.units.newListener([&](ofxGrblUnits&){
+//		sendUnits();
+//	}));
+//
+//	settingsListeners.push(_settings.maxTravel.newListener([&](glm::vec3&){
+//		areaRect.set(0,0, _settings.maxTravel->x, _settings.maxTravel->y);
+//	}));
+	
 	
 	if(_settings.load(this->settingsFileName)){
-		sendSettings();
+//		sendSettings();
 //		if (firstTimeLoad) {
 //			ofLogVerbose(" ofxGrbl ") << "FirstTimeLoad!" ;
 //			firstTimeLoad = false;

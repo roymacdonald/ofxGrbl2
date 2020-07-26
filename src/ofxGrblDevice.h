@@ -175,7 +175,8 @@ protected:
 
 	void update(ofEventArgs&);
 	ofEventListener updateListener;
-
+	ofEventListener exitListener;
+	
 	void sendUnits();
 
 	
