@@ -15,14 +15,14 @@ void parameter<T>::send()
 {
 	if(_parentDevice){
 		if(_isFloat){
-			_parentDevice->sendMessage(address+"=" + ofToString(param.get(), OFX_GRBL_FLOAT_RES));
+			_parentDevice->sendImmediateMessage(address+"=" + ofToString(param.get(), OFX_GRBL_FLOAT_RES));
 		}
 		else
 		{
-			_parentDevice->sendMessage(address+"=" + ofToString(param.get()));
+			_parentDevice->sendImmediateMessage(address+"=" + ofToString(param.get()));
 		}
 		
-		cout << "param sent: " << address << "=" << ofToString(param.get(), OFX_GRBL_FLOAT_RES) << "\n";
+//		cout << "param sent: " << address << "=" << ofToString(param.get(), OFX_GRBL_FLOAT_RES) << "\n";
 	}
 }
 
@@ -32,11 +32,11 @@ void parameter<glm::vec3>::send()
 	if(_parentDevice){
 
 		string addr = address.substr(0, address.size()-1);
-		
-		 _parentDevice->sendMessage( addr + "0=" + ofToString(param->x, OFX_GRBL_FLOAT_RES));
-		 _parentDevice->sendMessage( addr + "1=" + ofToString(param->y, OFX_GRBL_FLOAT_RES));
-		 _parentDevice->sendMessage( addr + "2=" + ofToString(param->z, OFX_GRBL_FLOAT_RES));
-		
+
+		 _parentDevice->sendImmediateMessage( addr + "0=" + ofToString(param->x, OFX_GRBL_FLOAT_RES));
+		 _parentDevice->sendImmediateMessage( addr + "1=" + ofToString(param->y, OFX_GRBL_FLOAT_RES));
+		 _parentDevice->sendImmediateMessage( addr + "2=" + ofToString(param->z, OFX_GRBL_FLOAT_RES));
+
 	}
 }
 
@@ -44,8 +44,8 @@ void parameter<glm::vec3>::send()
 device::device()
 {
 	
-	addToMap(vec3ParamMap, "$110", _settings.maxSpeed);
-	addToMap(vec3ParamMap, "$120", _settings.accel);
+//	addToMap(vec3ParamMap, "$110", _settings.maxSpeed);
+//	addToMap(vec3ParamMap, "$120", _settings.accel);
 	addToMap(vec3ParamMap, "$130", _settings.maxTravel);
 
 	addToMap(intParamMap, "$0", _settings.stepPulse);
@@ -64,15 +64,32 @@ device::device()
 	addToMap(boolParamMap, "$20", _settings.softLimits);
 	addToMap(boolParamMap, "$21", _settings.hardLimits);
 	addToMap(boolParamMap, "$22", _settings.homingCycles);
+	addToMap(boolParamMap, "$32", _settings.laserModeEnable);
+	
 	
 	addToMap(floatParamMap, "$11", _settings.junctionDeviat);
 	addToMap(floatParamMap, "$12", _settings.arcTolerance);
 	addToMap(floatParamMap, "$24", _settings.homingFeed);
 	addToMap(floatParamMap, "$25", _settings.homingSeek);
 	addToMap(floatParamMap, "$27", _settings.homingPullOff);
-	addToMap(floatParamMap, "$30", _settings.maxSpindleSpeed);
-	addToMap(floatParamMap, "$31", _settings.minSpindleSpeed);
+//	addToMap(floatParamMap, "$30", _settings.maxSpindleSpeed);
+//	addToMap(floatParamMap, "$31", _settings.minSpindleSpeed);
+    // using the spindle speed to store the pen servo up and down limits.
+    
+    addToMap(floatParamMap, "$30", _settings.downPos);
+    addToMap(floatParamMap, "$31", _settings.upPos);
 
+	addToMap(floatParamMap, "$110", _settings.maxSpeed.xy);
+	addToMap(floatParamMap, "$111", _settings.maxSpeed.xy);
+	addToMap(floatParamMap, "$112", _settings.maxSpeed.z);
+
+	addToMap(floatParamMap, "$120", _settings.accel.xy);
+	addToMap(floatParamMap, "$121", _settings.accel.xy);
+	addToMap(floatParamMap, "$122", _settings.accel.z);
+	
+	
+	
+	
 	readBuffer = "";
 	status = "";
 	
@@ -91,10 +108,19 @@ device::device()
 		areaRect.set(0,0, _settings.maxTravel->x, _settings.maxTravel->y);
 	}));
 	
+	settingsListeners.push(_settings.speed.xy.newListener(this, &device::speedParamChanged));
+//	settingsListeners.push(_settings.speed.z.newListener(this, &device::speedParamChanged));
+	
 	
 	isReadyToSend = true;
 	bConnected = false;
 	isDeviceReady = false;
+}
+
+//--------------------------------------------------------------
+device::~device()
+{
+
 }
 
 //--------------------------------------------------------------
@@ -104,31 +130,54 @@ void device::setup() {
 	// serial
 	serial.listDevices();
 	
-	gui.setup("GRBL", "ofxGrblSettings.xml");
+    string settingsFile = "ofxGrblSettings.json";
+    
+	gui.setup("GRBL", settingsFile);
 	ports = std::make_unique<ofxDropdown>(port);
 	
 	ports->enableCollapseOnSelection();
 	ports->disableMultipleSelection();
 
 	
-	ports->addListener(this, &device::portChanged);
+	dropdownListeners.push(port.newListener(this, &device::portChanged));
 	
-//	std::vector<int> bauds = {300, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400, 12000000};
 	
-//	baudrates = std::make_unique<ofxIntDropdown>(baudrate, bauds);
-//
-//	baudrates->addListener(this, &device::baudrateChanged);
+	
+	std::map<int, string> logLevelOptions =
+		{{(int)OF_LOG_VERBOSE,"VERBOSE"},
+		{(int)OF_LOG_NOTICE,"NOTICE"},
+		{(int)OF_LOG_WARNING,"WARNING"},
+		{(int)OF_LOG_ERROR,"ERROR"},
+		{(int)OF_LOG_FATAL_ERROR,"FATAL_ERROR"},
+		{(int)OF_LOG_SILENT, "SILENT"}};
+	
+	
+	
+	logLevel = std::make_unique<ofxIntDropdown>(loglevelParam, logLevelOptions);
+	
+	logLevel->enableCollapseOnSelection();
+	logLevel->disableMultipleSelection();
+	
+	dropdownListeners.push(loglevelParam.newListener(this, &device::logLevelChanged));
+	
+	
+	loglevelParam = (int) ofGetLogLevel();
+	
+	
 	
 	
 	gui.add(ports.get());
-//	gui.add(baudrates.get());
+	gui.add(logLevel.get());
 	
-	gui.add(getSettingsParams());
 	
+    getSettings().putIntoGui(gui);
+//	gui.add(getSettingsParams());
+    
+    
 	
 	dropdownListeners.push(ports->dropdownWillShow_E.newListener(this, &device::populatePortsDropdown));
 
-	
+    gui.loadFromFile(settingsFile);
 	
 }
 
@@ -165,6 +214,7 @@ void device::setup(string _port) {
 	
 }
 
+//--------------------------------------------------------------
 vector<std::string> device::getAvailablePorts()
 {
 
@@ -287,19 +337,30 @@ void device::update(ofEventArgs&) {
 		}
 	}
 	if (bConnected && isDeviceReady) {
-//		cout << ".";
-		// send
-		if (isReadyToSend){// && !isPause) {
-			if (sendQueList.size() > 0) {
-				sendMessage(sendQueList[0], true);
-				
-				sendQueList.erase(sendQueList.begin());
-				ofLogVerbose("device::update") << "Queue  size: " << sendQueList.size() ;
-				
-				isReadyToSend = false;
+		if (isReadyToSend){
+			if(!sendQueueElement(immediateSendQueList))
+			{
+				sendQueueElement(sendQueList);
 			}
 		}
 	}
+}
+//--------------------------------------------------------------
+bool device::sendQueueElement(vector<string> & queue)
+{
+	if (!isReadyToSend || queue.size() == 0) return false;
+	if(&immediateSendQueList == &queue)
+	{
+		ofLogNotice("device::sendQueueElement") << "Immediate message : " << queue[0] ;
+	}
+	
+	sendMessage(queue[0], true);
+
+	queue.erase(queue.begin());
+//	ofLogVerbose("device::update") << "Queue  size: " << queue.size() ;
+
+	isReadyToSend = false;
+	return true;
 }
 //--------------------------------------------------------------
 void device::close() {
@@ -395,39 +456,64 @@ void device::send(const ofPath& path){
 }
 //--------------------------------------------------------------
 void device::send(const ofPolyline& poly){
-	send(poly.getVertices());
+	send(poly.getVertices(), poly.isClosed());
 }
 //--------------------------------------------------------------
-void device::send(const std::vector<glm::vec3>& p){
+void device::send(const std::vector<glm::vec3>& p, bool isClosed){
 	
 	if(p.size()> 0){
 		sendMessage(getPositionModeString(OFXGRBL_ABSOLUTE));
 		if (_settings.mode == OFXGRBL_PLOTTER) {
 //			sendMessage("G0 Z1.0");//bring pen up
-			penUp();
+//			penUp();
 			setPosition({p[0].x, p[0].y, 1}, true);//set the position t the first polyline vertex
-//			sendMessage("G1 Z0.0" + getFeedRateString(_settings.speed->z, false));//bring pen down
-			penDown();
+//			sendMessage("G1 Z0.0" + getFeedRateString(_settings.speed.z, false));//bring pen down
+//			if(ofIsFloatEqual(0.0f, p[0].z))
+//			{
+//				penDown();
+//			}
 		}else{
 			setPosition(p[0], true);//set the position t the first polyline vertex
 		}
-		auto fr =  getFeedRateString(_settings.speed->x, false);
+        
+        if (_settings.mode == OFXGRBL_PLOTTER) {
+            setPosition(p[0], true);//set the position t the first polyline vertex
+        }
+        
+        
+		auto fr =  getFeedRateString(_settings.speed.xy);
+        
 		if(!fr.empty()){
 			sendMessage("G1" + fr);//set the feedrate(speed) of all subsequent moves
 		}
 		for(size_t i = 1; i < p.size(); i++){
 			sendMessage("G1" + vec3ToGcode(p[i]));
 		}
+        if(isClosed){
+            sendMessage("G1" + vec3ToGcode(p[0]));
+        }
+        
+        
 		if (_settings.mode == OFXGRBL_PLOTTER) {
-			sendMessage("G0 Z1.0");//bring pen up
+            int last = isClosed?0 : (p.size() -1);
+            sendMessage("G1" + vec3ToGcode({p[last].x, p[last].y, 1.0f} ));
+            
+//			sendMessage("G0 Z1.0");//bring pen up
 		}
 	}
 }
 //--------------------------------------------------------------
 void device::send(const std::vector<ofPolyline>& polys){
-	for(auto& p: polys){
-		send(p);
-	}
+    if (_settings.mode == OFXGRBL_PLOTTER) {
+        penUp();
+        for(auto& p: polys){
+            send(p, 0.0f);
+        }
+    }else{
+        for(auto& p: polys){
+            send(p);
+        }
+    }
 }
 //--------------------------------------------------------------
 void device::send(const ofPath& path, float z){
@@ -435,7 +521,7 @@ void device::send(const ofPath& path, float z){
 }
 //--------------------------------------------------------------
 void device::send(const ofPolyline& poly, float z){
-	send(poly.getVertices(), z);
+	send(poly.getVertices(), z, poly.isClosed());
 }
 //--------------------------------------------------------------
 void device::send(const std::vector<ofPolyline>& polys, float z){
@@ -444,14 +530,21 @@ void device::send(const std::vector<ofPolyline>& polys, float z){
 	}
 }
 //--------------------------------------------------------------
-void device::send(const std::vector<glm::vec3>& points, float z){
+void device::send(const std::vector<glm::vec3>& points, float z, bool isClosed){
 	auto p = points;
 	for(auto& v : p){
 		v.z = z;
 	}
-	send(p);
+	send(p, isClosed);
 }
-
+//--------------------------------------------------------------
+void device::send(const std::vector<std::string> & gcodes){
+    for(auto& g: gcodes){
+        if(!g.empty()){
+            sendQueList.push_back(g);
+        }
+    }
+}
 //--------------------------------------------------------------
 void device::sendMessage(const std::string& _msg, bool direct) {
 //	cout << _msg << endl;
@@ -477,25 +570,35 @@ void device::sendMessage(const std::string& _msg, bool direct) {
 	}
 }
 //--------------------------------------------------------------
+void device::sendImmediateMessage(const std::string& _msg)
+{
+	if (_msg != "") {
+		string _message = _msg;
+		immediateSendQueList.push_back(_message);
+	}
+}
+
+
+//--------------------------------------------------------------
 void device::penUp(){
-	sendMessage("G1 Z1.0" + getFeedRateString(_settings.speed->z, false));//bring pen down
+	sendMessage("G1 Z1.0" + getFeedRateString(_settings.speed.z));//bring pen up
 }
 //--------------------------------------------------------------
 void device::penDown(){
-	sendMessage("G1 Z0.0" + getFeedRateString(_settings.speed->z, false));//bring pen down
+	sendMessage("G1 Z0.0" + getFeedRateString(_settings.speed.z));//bring pen down
 }
-//--------------------------------------------------------------
-void device::saveSettings(const std::string& settingsFileName) {
-	if(settingsFileName != ""){
-		this->settingsFileName = settingsFileName;
-	}
-	_settings.save(this->settingsFileName);
-}
-//--------------------------------------------------------------
-void device::loadSettings(const std::string& settingsFileName) {
-	if(settingsFileName != ""){
-		this->settingsFileName = settingsFileName;
-	}
+////--------------------------------------------------------------
+//void device::saveSettings(const std::string& settingsFileName) {
+//	if(settingsFileName != ""){
+//		this->settingsFileName = settingsFileName;
+//	}
+//	_settings.save(this->settingsFileName);
+//}
+////--------------------------------------------------------------
+//void device::loadSettings(const std::string& settingsFileName) {
+//	if(settingsFileName != ""){
+//		this->settingsFileName = settingsFileName;
+//	}
 	
 //	settingsListeners.unsubscribeAll();
 	
@@ -508,15 +611,15 @@ void device::loadSettings(const std::string& settingsFileName) {
 //	}));
 	
 	
-	if(_settings.load(this->settingsFileName)){
+//	if(_settings.load(this->settingsFileName)){
 //		sendSettings();
 //		if (firstTimeLoad) {
 //			ofLogVerbose(" ofxGrbl ") << "FirstTimeLoad!" ;
 //			firstTimeLoad = false;
 //			//			currentPos = glm::vec3(_settings.homePosition->x  * _settings.maxTravel->x, _settings.homePosition->y  * _settings.maxTravel->y, _settings.homePosition->z  * _settings.maxTravel->z);
 //		}
-	}
-}
+//	}
+//}
 //--------------------------------------------------------------
 void device::sendSettings() {
 	
@@ -565,6 +668,14 @@ void device::goHome() {
 //--------------------------------------------------------------
 void device::killAlarmLock() {
 	sendMessage("$X", true);
+}
+//--------------------------------------------------------------
+void device::reset(){
+	
+	string s = "$";
+	s += 0x18;
+	sendMessage(s, true);
+	lastFeedRateSent = 0;
 }
 //--------------------------------------------------------------
 void device::connect(string _port){//}, int _baudrate) {
@@ -648,24 +759,24 @@ string device::getPositionModeString(ofxGrblPositionMode newMode){
 	return "";
 }
 //--------------------------------------------------------------
-string device::getFeedRateString(const float& newFeedrate, bool bRapidMovement){
-//	cout << "device::getFeedRateString  " << newFeedrate << "  " << lastFeedRateSent << "\n";
+string device::getFeedRateString(const float& newFeedrate){
+//	std::cout << "device::getFeedRateString  " << newFeedrate << "  " << lastFeedRateSent << "\n";
 	
-//	int index = bRapidMovement?0:1;
-//	if(!ofIsFloatEqual(newFeedrate, lastFeedRateSent[index])){
-//		lastFeedRateSent[index] = newFeedrate;
+
+	if(!ofIsFloatEqual(newFeedrate, lastFeedRateSent)){
+		lastFeedRateSent = newFeedrate;
 //		cout << "device::getFeedRateString  " << lastFeedRateSent[index] << " Rapid Movement: " << boolalpha << bRapidMovement << "\n";
-//		return " F"+ ofToString(lastFeedRateSent[index]);
-//	}
-//	return "";
-	return " F"+ ofToString(newFeedrate, OFX_GRBL_FLOAT_RES);
+		return " F"+ ofToString(lastFeedRateSent, OFX_GRBL_FLOAT_RES);
+	}
+	return "";
+//	return " F"+ ofToString(newFeedrate, OFX_GRBL_FLOAT_RES);
 }
 //--------------------------------------------------------------
 void device::setPosition(const glm::vec3& _pos, bool bRapidMovement, bool _sendDirect, ofxGrblPositionMode _positionMode) {
 	string msg = getPositionModeString(_positionMode);
 	msg += (string)(bRapidMovement?"G0":"G1"); // send rapid or nonrapid movement command
 	msg += vec3ToGcode(_pos);// send position
-	msg += getFeedRateString(_settings.speed->x, bRapidMovement);// send feedrate
+	msg += getFeedRateString(_settings.speed.xy);// send feedrate
 	
 	sendMessage(msg, _sendDirect);
 }
@@ -685,11 +796,21 @@ void device::moveUp(float _mm) {
 void device::moveDown(float _mm) {
 	moveUp(_mm * -1.f);
 }
-//--------------------------------------------------------------
-string device::vec3ToGcode( const glm::vec3& _vec) {
-	return " X" + ofToString(_vec.x , OFX_GRBL_FLOAT_RES) + " Y" + ofToString(_vec.y, OFX_GRBL_FLOAT_RES) + " Z" + ofToString(_vec.z, OFX_GRBL_FLOAT_RES);
-}
 
+
+//--------------------------------------------------------------
+void device::speedParamChanged(float & s)
+{
+	auto fr =  getFeedRateString(_settings.speed.xy);
+	if(!fr.empty()){
+		sendImmediateMessage("G1" + fr);//set the feedrate(speed) of all subsequent moves
+	}
+}
+//--------------------------------------------------------------
+void device::logLevelChanged(int& l)
+{
+	ofSetLogLevel(ofLogLevel(l));
+}
 
 }
 

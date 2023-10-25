@@ -70,6 +70,7 @@ class device{
 public:
 	
 	device();
+	~device();
 	
 	void setup();
 	
@@ -88,7 +89,7 @@ public:
 	void loadGCodeFromFile(const std::string& _path);
 	
 	void sendMessage(const std::string& _msg, bool direct = false);
-	
+	void sendImmediateMessage(const std::string& _msg);
 	
 	
 	void clear();
@@ -101,7 +102,7 @@ public:
 	void setSpindleSpeed(int _speed, bool _direct = false);
 	
 	
-	
+	void reset();
 	void killAlarmLock();
 	
 	void moveRight(float _mm);
@@ -112,21 +113,22 @@ public:
 	void setPosition(const glm::vec3& _pos, bool bRapidMovement = false, bool _sendDirect = false, ofxGrblPositionMode positionMode = OFXGRBL_ABSOLUTE);
 	
 	// Settings
-	void saveSettings(const std::string& settingsFileName = "");
-	void loadSettings(const std::string& settingsFileName = "");
+//	void saveSettings(const std::string& settingsFileName = "");
+//	void loadSettings(const std::string& settingsFileName = "");
 
 	
 	void send(const ofPath& path);
 	void send(const ofPolyline& poly);
 	void send(const std::vector<ofPolyline>& polys);
-	void send(const std::vector<glm::vec3>& points);
+	void send(const std::vector<glm::vec3>& points, bool isClosed);
 	
 	// force the z position of the polys and paths sent
 	void send(const ofPath& path, float z);
 	void send(const ofPolyline& poly, float z);
 	void send(const std::vector<ofPolyline>& polys, float z);
-	void send(const std::vector<glm::vec3>& points, float z);
+	void send(const std::vector<glm::vec3>& points, float z, bool isClosed);
 	
+    void send(const std::vector<std::string> & gcodes);
 	
 	/// sets the device to use either millimeters or inches as the units being used for the commands. Default is millimeters
 	/// Possible parameters passed are either OFXGRBL_MILLIMETERS or OFXGRBL_INCHES
@@ -151,26 +153,28 @@ public:
 	
 	bool canSend(){return isReadyToSend;}
 	
-	
+    string getHelpString();
+    
 	ofxPanel gui;
 	
 	
 protected:
 	
 	std::unique_ptr<ofxDropdown> ports = nullptr;
+	std::unique_ptr<ofxIntDropdown> logLevel = nullptr;
 //	std::unique_ptr<ofxIntDropdown> baudrates = nullptr;
 	
 	void portChanged(std::string& port);
-//	void baudrateChanged(int& bd);
+	void logLevelChanged(int& bd);
 	ofEventListeners dropdownListeners;
 	
 	void populatePortsDropdown();
 //	void populateBaudratesDropdown();
 	
-	string vec3ToGcode( const glm::vec3& _vec);
+	//string vec3ToGcode( const glm::vec3& _vec);
 	
 	glm::vec3 currentPos;
-	string settingsFileName;
+//	string settingsFileName;
 	ofRectangle areaRect;
 
 	void update(ofEventArgs&);
@@ -184,25 +188,35 @@ protected:
 	bool bConnected;
 	bool isDeviceReady;
 	ofParameter<string> port = {"port", ""};
-//	ofParameter<int> baudrate = {"baudrate", 115200, 300, 12000000};
+	ofParameter<int> loglevelParam = {"log level", int(OF_LOG_NOTICE), (int)OF_LOG_VERBOSE, int(OF_LOG_SILENT)};
 
+	
+
+    
+	
 	int baudrate = 115200;
 	
 	void _closeSerial();
 	
+	
+	
 private:
 	
+	
+	void speedParamChanged(float & s);
 	
 	bool bIgnorePortChange = false;
 	
 	
 	vector<string> sendQueList;
-
+	vector<string> immediateSendQueList;
+	
+	bool sendQueueElement(vector<string> & queue);
 	
 	
-	float lastFeedRateSent[2] = {0.0, 0.0};
+	float lastFeedRateSent = 0.0;
 	
-	string getFeedRateString(const float& newFeedrate, bool bRapidMovement);
+	string getFeedRateString(const float& newFeedrate);
 	
 	ofxGrblPositionMode positionMode = OFXGRBL_ABSOLUTE;
 	string getPositionModeString(ofxGrblPositionMode newMode);

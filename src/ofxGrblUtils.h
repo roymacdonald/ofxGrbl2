@@ -11,12 +11,12 @@
 namespace ofxGrbl{
 	
 	
-	bool checkMoveCommand(const std::string& _line){
+    static bool checkMoveCommand(const std::string& _line){
 		return (_line.find('X') != string::npos) || (_line.find('Y') != string::npos) || (_line.find('Z') != string::npos);
 	}
 	
 	//--------------------------------------------------------------
-	glm::vec3 gcodeToVec3(const std::string& _line){
+	static glm::vec3 gcodeToVec3(const std::string& _line){
 		glm::vec3 _result = {0.,0.,0.};
 		vector<string> _commands = ofSplitString(_line, " ", true);
 		for (int i = 0; i < _commands.size(); i++) {
@@ -56,6 +56,10 @@ namespace ofxGrbl{
 	}
 	//--------------------------------------------------------------
 	
+//--------------------------------------------------------------
+    static string vec3ToGcode( const glm::vec3& _vec) {
+        return " X" + ofToString(_vec.x , OFX_GRBL_FLOAT_RES) + " Y" + ofToString(_vec.y, OFX_GRBL_FLOAT_RES) + " Z" + ofToString(_vec.z, OFX_GRBL_FLOAT_RES);
+    }
 	
 	
 }

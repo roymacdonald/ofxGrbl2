@@ -13,11 +13,11 @@
 #define OFX_GRBL_FLOAT_RES 6
 
 
-enum ofxGrblMode{
-	OFXGRBL_SPINDLE,
-	OFXGRBL_LASER,
-	OFXGRBL_PLOTTER
-} ;
+//enum ofxGrblMode{
+#define OFXGRBL_SPINDLE 0
+#define OFXGRBL_LASER 1
+#define OFXGRBL_PLOTTER 2
+//} ;
 
 enum ofxGrblUnits{
 	OFXGRBL_MILLIMETERS,
